@@ -1,0 +1,9 @@
+{
+  "smooth_factor": 0.03,
+  "dead_zone_rad": 0.0001,
+  "silent_ratio": 1.0,
+  "adaptive_smoothing": true,
+  "micro_adjustment": true,
+  "center_lock_strength": 0.98,
+  "stability_boost": 0.25
+}
