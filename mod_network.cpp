@@ -2,18 +2,47 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
-// Không gian lưu trữ cấu hình trong bộ nhớ của Mod
+// =========================================================================
+// KHÔNG GIAN LƯU TRỮ CẤU HÌNH TRONG BỘ NHỚ (COMPATIBLE WITH YOUR JSON)
+// =========================================================================
 namespace Config {
-    float SMOOTH_FACTOR    = 0.15f;   // Giá trị mặc định nếu mất mạng
-    float DEAD_ZONE_RAD    = 0.002f;  // Giá trị mặc định
-    float AIM_SILENT_RATIO = 0.90f;   // Giá trị mặc định
+    // Trạng thái chung
+    std::string VER_ADDR = "";
+    bool RESET_GUEST = false;
+
+    // Display (Màn hình)
+    int FPS = 60;
+    int REFRESH_RATE = 60;
+
+    // Touch (Cảm ứng)
+    int SAMPLING_RATE = 240;
+    float SENSITIVITY = 1.0f;
+    bool RESPONSE_BOOST = false;
+    bool GESTURE_OPTIMIZATION = false;
+
+    // Performance (Hiệu năng)
+    bool HIGH_PERFORMANCE_MODE = false;
+    bool CPU_BOOST = false;
+    bool GPU_BOOST = false;
+    bool MEMORY_OPTIMIZATION = false;
+    bool THERMAL_OPTIMIZATION = false;
+    bool LATENCY_REDUCTION = false;
+
+    // Graphics (Đồ họa)
+    bool FRAME_PACING = false;
+    bool LOW_LATENCY = false;
+    bool RENDER_OPTIMIZATION = false;
 }
 
-// ==========================================
-// THUẬT TOÁN PHÂN TÍCH CHUỖI JSON ĐỘC LẬP
-// ==========================================
-float ParseJsonFloat(const std::string& json, const std::string& key) {
+// =========================================================================
+// THUẬT TOÁN PHÂN TÍCH CHUỖI JSON ĐỘC LẬP (KHÔNG DÙNG THƯ VIỆN NGOÀI)
+// =========================================================================
+
+// Hàm trích xuất giá trị kiểu Số (Int / Float) từ chuỗi JSON
+float GetJsonNumber(const std::string& json, const std::string& key) {
     size_t pos = json.find("\"" + key + "\"");
     if (pos == std::string::npos) return -1.0f;
     
@@ -21,80 +50,104 @@ float ParseJsonFloat(const std::string& json, const std::string& key) {
     if (pos == std::string::npos) return -1.0f;
     
     size_t start = json.find_first_of("0123456789.-", pos);
-    size_t end = json.find_first_not_of("0123456789.-", start);
+    if (start == std::string::npos) return -1.0f;
     
-    if (start != std::string::npos) {
-        std::string valStr = json.substr(start, end - start);
-        try {
-            return std::stof(valStr);
-        } catch (...) {
-            return -1.0f;
-        }
-    }
-    return -1.0f;
-}
-
-// ==========================================
-// HÀM KẾT NỐI MẠNG QUA ANDROID JNI
-// ==========================================
-void FetchConfigFromGitHub(JNIEnv* env) {
-    // Đường dẫn tĩnh tới file chứa thông số Service Mod của riêng bạn
-    std::string urlStr = "https://github.io";
-
-    // Khởi tạo đối tượng java.net.URL
-    jclass urlClass = env->FindClass("java/net/URL");
-    jmethodID urlInit = env->GetMethodID(urlClass, "<init>", "(Ljava/lang/String;)V");
-    jstring urlJStr = env->NewStringUTF(urlStr.c_str());
-    jobject urlObj = env->NewObject(urlClass, urlInit, urlJStr);
-
-    // Mở kết nối URLConnection
-    jmethodID openConn = env->GetMethodID(urlClass, "openConnection", "()Ljava/net/URLConnection;");
-    jobject connObj = env->CallObjectMethod(urlObj, openConn);
-
-    // Lấy InputStream từ kết nối mạng
-    jclass connClass = env->FindClass("java/net/URLConnection");
-    jmethodID getInputStream = env->GetMethodID(connClass, "getInputStream", "()Ljava/io/InputStream;");
-    jobject streamObj = env->CallObjectMethod(connObj, getInputStream);
-
-    // Sử dụng java.util.Scanner để đọc toàn bộ dữ liệu văn bản từ luồng mạng
-    jclass scannerClass = env->FindClass("java/util/Scanner");
-    jmethodID scannerInit = env->GetMethodID(scannerClass, "<init>", "(Ljava/io/InputStream;)V");
-    jobject scannerObj = env->NewObject(scannerClass, scannerInit, streamObj);
-
-    // Đặt Delimiter đọc từ đầu đến cuối chuỗi (\A)
-    jmethodID useDelimiter = env->GetMethodID(scannerClass, "useDelimiter", "(Ljava/lang/String;)Ljava/util/Scanner;");
-    jstring delim = env->NewStringUTF("\\A");
-    env->CallObjectMethod(scannerObj, useDelimiter, delim);
-
-    // Chuyển đổi toàn bộ kết quả phản hồi thành chuỗi ký tự Java String
-    jmethodID nextMethod = env->GetMethodID(scannerClass, "next", "()Ljava/lang/String;");
-    jstring resultJStr = (jstring)env->CallObjectMethod(scannerObj, nextMethod);
-
-    if (resultJStr != nullptr) {
-        const char* rawJson = env->GetStringUTFChars(resultJStr, nullptr);
-        std::string jsonStr(rawJson);
-        env->ReleaseStringUTFChars(resultJStr, rawJson);
-
-        // Tiến hành bóc tách dữ liệu từ chuỗi JSON thô vừa tải về
-        float smooth = ParseJsonFloat(jsonStr, "smooth_factor");
-        float deadzone = ParseJsonFloat(jsonStr, "dead_zone_rad");
-        float silent = ParseJsonFloat(jsonStr, "silent_ratio");
-
-        // Nếu thông số hợp lệ (lớn hơn 0), cập nhật trực tiếp vào cấu hình Mod
-        if (smooth > 0) Config::SMOOTH_FACTOR = smooth;
-        if (deadzone > 0) Config::DEAD_ZONE_RAD = deadzone;
-        if (silent > 0) Config::AIM_SILENT_RATIO = silent;
+    size_t end = json.find_first_not_of("0123456789.-", start);
+    try {
+        return std::stof(json.substr(start, end - start));
+    } catch (...) {
+        return -1.0f;
     }
 }
 
-// ==========================================
-// CỔNG GIAO TIẾP JNI NATIVE CHUẨN KHI KHỞI CHẠY
-// ==========================================
+// Hàm trích xuất giá trị kiểu Đúng / Sai (Boolean: true / false) từ chuỗi JSON
+bool GetJsonBool(const std::string& json, const std::string& key) {
+    size_t pos = json.find("\"" + key + "\"");
+    if (pos == std::string::npos) return false;
+    
+    pos = json.find(":", pos);
+    if (pos == std::string::npos) return false;
+    
+    size_t nextTrue = json.find("true", pos);
+    size_t nextFalse = json.find("false", pos);
+    
+    if (nextTrue != std::string::npos && (nextFalse == std::string::npos || nextTrue < nextFalse)) {
+        if (nextTrue - pos < 10) return true; // Giới hạn khoảng cách ký tự hợp lệ
+    }
+    return false;
+}
+
+// Hàm trích xuất giá trị kiểu Chuỗi chữ (String) từ chuỗi JSON
+std::string GetJsonString(const std::string& json, const std::string& key) {
+    size_t pos = json.find("\"" + key + "\"");
+    if (pos == std::string::npos) return "";
+    
+    pos = json.find(":", pos);
+    if (pos == std::string::npos) return "";
+    
+    size_t start = json.find("\"", pos);
+    if (start == std::string::npos) return "";
+    
+    size_t end = json.find("\"", start + 1);
+    if (end == std::string::npos) return "";
+    
+    return json.substr(start + 1, end - start - 1);
+}
+
+// =========================================================================
+// HÀM ĐỌC FILE CONFIG CỤC BỘ TỪ THƯ MỤC DATA CỦA GAME
+// =========================================================================
+void LoadLocalConfig() {
+    // Đường dẫn chính xác tới thư mục files của game Free Fire Max
+    std::string filePath = "/sdcard/Android/data/com.dts.freefiremax/files/localconfig.json";
+    std::ifstream file(filePath);
+    
+    if (!file.is_open()) {
+        return; // Nếu không tìm thấy file localconfig.json, giữ nguyên cấu hình gốc mặc định
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string jsonStr = buffer.str();
+    file.close();
+
+    // Bắt đầu nạp dữ liệu từ tệp JSON vào các biến hệ thống toàn cục
+    Config::VER_ADDR = GetJsonString(jsonStr, "verAddr");
+    Config::RESET_GUEST = GetJsonBool(jsonStr, "resetGuest");
+
+    // Phân tích nhóm cấu hình: Display
+    Config::FPS = (int)GetJsonNumber(jsonStr, "fps");
+    Config::REFRESH_RATE = (int)GetJsonNumber(jsonStr, "refreshRate");
+
+    // Phân tích nhóm cấu hình: Touch
+    Config::SAMPLING_RATE = (int)GetJsonNumber(jsonStr, "samplingRate");
+    Config::SENSITIVITY = GetJsonNumber(jsonStr, "sensitivity");
+    Config::RESPONSE_BOOST = GetJsonBool(jsonStr, "responseBoost");
+    Config::GESTURE_OPTIMIZATION = GetJsonBool(jsonStr, "gestureOptimization");
+
+    // Phân tích nhóm cấu hình: Performance
+    Config::HIGH_PERFORMANCE_MODE = GetJsonBool(jsonStr, "highPerformanceMode");
+    Config::CPU_BOOST = GetJsonBool(jsonStr, "cpuBoost");
+    Config::GPU_BOOST = GetJsonBool(jsonStr, "gpuBoost");
+    Config::MEMORY_OPTIMIZATION = GetJsonBool(jsonStr, "memoryOptimization");
+    Config::THERMAL_OPTIMIZATION = GetJsonBool(jsonStr, "thermalOptimization");
+    Config::LATENCY_REDUCTION = GetJsonBool(jsonStr, "latencyReduction");
+
+    // Phân tích nhóm cấu hình: Graphics
+    Config::FRAME_PACING = GetJsonBool(jsonStr, "framePacing");
+    Config::LOW_LATENCY = GetJsonBool(jsonStr, "lowLatency");
+    Config::RENDER_OPTIMIZATION = GetJsonBool(jsonStr, "renderOptimization");
+}
+
+// =========================================================================
+// CỔNG GIAO TIẾP NATIVE JNI CHUẨN KHI ỨNG DỤNG KHỞI CHẠY
+// =========================================================================
 extern "C" JNIEXPORT void JNICALL
 Java_com_android_systemui_NativeEngine_Init(JNIEnv* env, jobject thiz, jlong base, jlong sOff, jlong uOff) {
     
-    // Tự động chạy ngầm tải cấu hình từ Github về nạp vào biến tĩnh trước khi xử lý Hook game
-    FetchConfigFromGitHub(env);
+    // Tự động quét và nạp file cấu hình localconfig.json từ máy vào bộ nhớ trước khi xử lý Hook game
+    LoadLocalConfig();
 
-    // Tiếp tục thực hiện logic nạp Offset và kích hoạt Hook...
+    // Tiếp tục thực hiện logic nạp Offset, kích hoạt luồng Hook ngầm của game...
+    // (Bạn có thể thêm các mã xử lý FPS/Touch thực tế dựa vào các biến Config::... tại đây)
 }
