@@ -5,5 +5,27 @@
   "adaptive_smoothing": true,
   "micro_adjustment": true,
   "center_lock_strength": 0.98,
-  "stability_boost": 0.25
+  "stability_boost": 0.25,
+
+  "fps": 120,
+  "refreshRate": 120,
+
+  "samplingRate": 480,
+  "sensitivity": 1.0,
+  "responseBoost": true,
+  "gestureOptimization": true,
+
+  "highPerformanceMode": true,
+  "cpuBoost": true,
+  "gpuBoost": true,
+  "memoryOptimization": true,
+  "thermalOptimization": true,
+  "latencyReduction": true,
+
+  "framePacing": true,
+  "lowLatency": true,
+  "renderOptimization": true,
+
+  "verAddr": "ktvvn.github.io",
+  "resetGuest": false
 }
